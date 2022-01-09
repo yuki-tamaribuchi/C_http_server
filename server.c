@@ -41,6 +41,7 @@ int send_msg(int fd, char *msg);
 int main(){
 	int sockfd, new_sockfd;
 	int writer_len;
+	int flag;
 
 	//sockaddr_inは、接続先のIPアドレスやポート番号を保持するための構造体。
 	struct sockaddr_in reader_addr, writer_addr;
@@ -77,6 +78,12 @@ int main(){
 		exit(1);
 	}
 
+	flag=1;
+	if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, (char *)&flag, sizeof(flag))<0){
+		fprintf(stderr, "error: setsocketopt()\n");
+		exit(1);
+	}
+
 	//ソケットを待ち状態へ
 	//int listen(int sockfd, int backlog);
 	//第一引数、省略。第二引数、保留中のキューの最大長。
@@ -100,9 +107,9 @@ int main(){
 		}
 	}
 	close(sockfd);
-
 	return 0;
 }
+	
 
 
 void http(int sockfd){
@@ -116,6 +123,7 @@ void http(int sockfd){
 	char uri_addr[256];
 	char http_ver[64];
 	char *uri_file;
+
 
 	//データの受信
 	//ssize_t read(int fd, void *buf, size_t count);
@@ -133,7 +141,10 @@ void http(int sockfd){
 			//int open(const char *path, int mode, [mode_t creat_mode])
 			//第一引数、path。第二引数、許可を与えるモード。第三引数、O_CREATの場合にオープンするファイルのモード。
 			if ((read_fd=open(uri_file, O_RDONLY, 0666))==-1){
-				send_msg(sockfd, "404 Not Found");
+				send_msg(sockfd, "HTTP/1.0 404 Not Found\r\n");
+				send_msg(sockfd, "text/html\r\n");
+				send_msg(sockfd, "\r\n");
+				send_msg(sockfd, "404 Not Found\r\n");
 			}else{
 				send_msg(sockfd, "HTTP/1.0 200 OK\r\n");
 				send_msg(sockfd, "text/html\r\n");
@@ -144,12 +155,11 @@ void http(int sockfd){
 						break;
 					}
 				}
-				//ソケットを閉じて通信接続を終了する。
+				//ファイルのファイルディスクリプタをcloseする。
 				close(read_fd);
-			}
-		}else if (strcmp(meth_name, "POST")==0){
-			uri=uri_addr+1;
-		}else{
+		}
+		}
+		else{
 			send_msg(sockfd, "501 Not Implemented");
 		}
 	}
